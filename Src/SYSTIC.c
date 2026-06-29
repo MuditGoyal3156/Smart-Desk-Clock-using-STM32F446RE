@@ -1,10 +1,3 @@
-/*
- * SYSTIC.c
- *
- *  Created on: 06-Jun-2026
- *      Author: mudit
- */
-
 #include "SYSTIC.h"
 
 void one_sec_delay(void)
@@ -16,10 +9,10 @@ void one_sec_delay(void)
 	SYST_CVR = 0;
 
 	//Set clock source,enable interrupt and systick timer
-	SYST_CSR |= CLK_SRC | COUNTER_EN;
+	SYST_CSR |= CLK_SRC | COUNTER_EN | TICKINT_EN;
 
-	while(!(SYST_CSR &(1U << 16)));
-	SYST_CSR &= ~(1U << 0);
+
+
 
 }
 
