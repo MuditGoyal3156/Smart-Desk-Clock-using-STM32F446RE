@@ -166,8 +166,8 @@ void I2C_INTERRUPT_EN(void)
 	NVIC_EnableIRQ(I2C1_ER_IRQn);
 
 	//Configure Priority
-	NVIC_SetPriority(I2C1_EV_IRQn,2);
-	NVIC_SetPriority(I2C1_ER_IRQn,3);
+	NVIC_SetPriority(I2C1_EV_IRQn,10);
+	NVIC_SetPriority(I2C1_ER_IRQn,11);
 }
 
 void I2C_CloseSendData(I2C_Handle_t *pI2CHandle)

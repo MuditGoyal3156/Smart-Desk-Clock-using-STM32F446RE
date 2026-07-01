@@ -19,6 +19,7 @@ void Display_Data(uint8_t *data,uint32_t length);
 void Display_Init(void);
 void Display_Update(void);
 void Display_StopScroll(void);
+void set_contrast(uint8_t value);
 void Display_ScrollRight(uint8_t start_page, uint8_t end_page);
 void Display_ScrollLeft(uint8_t start_page, uint8_t end_page);
 void reset(void);

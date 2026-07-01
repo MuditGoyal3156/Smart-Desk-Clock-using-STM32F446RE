@@ -1,5 +1,6 @@
 #include "SYSTIC.h"
-
+#define STM32F446xx
+#include "stm32f4xx.h"
 void one_sec_delay(void)
 {
 	//Load value in the reload register
@@ -11,6 +12,8 @@ void one_sec_delay(void)
 	//Set clock source,enable interrupt and systick timer
 	SYST_CSR |= CLK_SRC | COUNTER_EN | TICKINT_EN;
 
+	//Set Priority
+	NVIC_SetPriority(SysTick_IRQn, 4);
 
 
 

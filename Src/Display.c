@@ -84,7 +84,10 @@ void Display_Init(void){
 	Send_Command(SSD1306_DISPLAYON);
 }
 
-
+void set_contrast(uint8_t value){
+	Send_Command(SSD1306_SETCONTRAST);
+	Send_Command(value);
+}
 
 void Display_Update(void) {
 
