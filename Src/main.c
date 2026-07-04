@@ -127,24 +127,38 @@ int main(void)
 								sprintf(pressure_str,"Pressure: %ld.%02ld hPa",p_int,p_dec);
 							}
 						}
+
+						char line1[24];
+						char line2[24];
+						char line3[24];
+						char line4[24];
+
+						sprintf(line1,"Date: %02d/%02d/%02d", Date.Date, Date.Month, Date.Year);
+						sprintf(line2,"Time: %02d:%02d", Time.Hours, Time.Minutes);
+						sprintf(line3,"Temp: %ld.%02ldC",t_int,t_dec);
+						sprintf(line4,"Hum:  %d.%d %%", sensor.humidity/10,sensor.humidity%10);
+
+						draw_text(48,0,8,"HOME");
+						draw_text(0,16,8,line1);
+						draw_text(0,28,8,line2);
+						draw_text(0,40,8,line3);
+						draw_text(0,52,8,line4);
+
+					}else{
+						char line1[24];
+						char line2[24];
+
+
+						sprintf(line1,"Date: %02d/%02d/%02d", Date.Date, Date.Month, Date.Year);
+						sprintf(line2,"Time: %02d:%02d", Time.Hours, Time.Minutes);
+
+
+						draw_text(48,0,8,"HOME");
+						draw_text(0,16,8,line1);
+						draw_text(0,28,8,line2);
+
 					}
-				    char line1[24];
-				    char line2[24];
-				    char line3[24];
-				    char line4[24];
-
-				    sprintf(line1,"Date: %02d/%02d/%02d", Date.Date, Date.Month, Date.Year);
-				    sprintf(line2,"Time: %02d:%02d", Time.Hours, Time.Minutes);
-				    sprintf(line3,"Temp: %ld.%02ldC",t_int,t_dec);
-				    sprintf(line4,"Hum:  %d.%d %%", sensor.humidity/10,sensor.humidity%10);
-
-				    draw_text(48,0,8,"HOME");
-				    draw_text(0,16,8,line1);
-				    draw_text(0,28,8,line2);
-				    draw_text(0,40,8,line3);
-				    draw_text(0,52,8,line4);
-				    break;
-
+					 break;
 				case 1:
 				    char HOUR_DISPLAY[24];
 				    char MINUTE_DISPLAY[24];
@@ -307,7 +321,6 @@ void RTC_Alarm_IRQHandler(void)
 
         EXTI->PR = (1U << 17);
 
-        printf("ALARM SET\r\n");
         BUZZ_ON();
 
     }
@@ -398,7 +411,6 @@ void EXTI9_5_IRQHandler(void){
         		alarm_minute = (alarm_minute + 1) % 60;
         		break;
         	}
-
         	time.Hours = alarm_hour;
 			time.Minutes = alarm_minute;
 			time.Seconds = 5;
@@ -414,24 +426,63 @@ void EXTI9_5_IRQHandler(void){
 }
 
 void EXTI15_10_IRQHandler(void){
-
     if (EXTI->PR & (1U << 10))
     {
         // Clear the pending bit
         EXTI->PR |= (1U << 10);
         if(navigation == 0){
-        	RTC_INIT(&Time,&Date);
+        	RTC_UPDATE(&Time,&Date);
         	set_date = 0;
         	for(int i = 0; i< 20000;i++);
-
         }else if(navigation == 1){
         	Alarm_INIT(&time, &Data);
         }else if(navigation == 2){
+        	if(Time.Minutes + timer > 60){
+        		if(Time.Minutes > timer){
+        			uint8_t new_timer = Time.Minutes - timer;
+        			if(Time.Hours == 23){
+						time.Hours = 0;
+						time.Minutes = new_timer;
+						time.Seconds = 5;
+						Alarm_INIT(&time, &Data);
+        			}else{
+						time.Hours = Time.Hours + 1;
+						time.Minutes = new_timer;
+						time.Seconds = 5;
+						Alarm_INIT(&time, &Data);
+        			}
+        		}else{
+					uint8_t new_timer = timer - Time.Minutes;
+					if(Time.Hours == 23){
+						time.Hours = 0;
+						time.Minutes = new_timer;
+						time.Seconds = 5;
+						Alarm_INIT(&time, &Data);
+					}else{
+						time.Hours = Time.Hours + 1;
+						time.Minutes = new_timer;
+						time.Seconds = 5;
+						Alarm_INIT(&time, &Data);
+					}
+        		}
 
+        	}else{
+    			if(Time.Hours == 23){
+					time.Hours = 0;
+					time.Minutes = Time.Minutes + timer;
+					time.Seconds = 5;
+					Alarm_INIT(&time, &Data);
+    			}else{
+                	time.Hours =Time.Hours;
+        			time.Minutes = Time.Minutes + timer;
+        			time.Seconds = 5;
+        			Alarm_INIT(&time, &Data);
+    			}
+        	}
         }
 
         // Simple debounce delay
         for(int i = 0; i< 250000;i++); //debounce
     }
+  }
 
-}

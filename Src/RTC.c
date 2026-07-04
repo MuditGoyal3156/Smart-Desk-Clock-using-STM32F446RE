@@ -46,8 +46,65 @@ void RTC_INIT(RTC_TIME *time,RTC_DATE *date){
     RTC->PRER = (127 << 16) | 255;
 
 	//Load the initial time and date values in the shadow registers (RTC_TR and RTC_DR)
+    if (!(RTC->ISR & (1U << 4))) {  // INITS flag: 0 = not initialized
         INIT_DATE(date);
         INIT_TIME(time);
+    }
+
+
+	//Configure the time format (12 or 24 hours) through the FMT bit in the RTC_CR
+    RTC->CR &= ~(1U << 6);
+
+	//Exit the initialization mode by clearing the INIT bit
+	RTC->ISR &= ~(1U << 7);
+
+	//Enable Write Protection
+	RTC->WPR = 0XFF;
+}
+
+void RTC_UPDATE(RTC_TIME *time,RTC_DATE *date){
+	//Enable PWR CLK(APB1)
+	RCC->APB1ENR |= (1U << 28);
+
+	// Set DBP bit of the PWR_CR
+	PWR->CR |= (1U << 8);
+
+	//Turn on LSE( LSEON bit in RCC_BDCR)
+	RCC->BDCR |= (1U << 0);
+
+	//Wait for Crystal to settle( LSERDY flag in RCC_BDCR)
+	while(!(RCC->BDCR & (1U << 1)));
+
+	//Select clock source RTCSEL[1:0] bits in RCC_BDCR
+	RCC->BDCR &= ~(3U << 8);
+	RCC->BDCR |= (1U << 8);
+
+	//Enable RTC CLK
+	RCC->BDCR |= (1U << 15);
+
+	//Remove Write protection
+	/*
+	 * IN RTC_WPR Register
+	 * Write 0xCA
+	 * Write 0x53
+	 * In order
+	 */
+	RTC->WPR = 0XCA;
+	RTC->WPR = 0X53;
+
+	//Set INIT bit to 1 in the RTC_ISR register to enter initialization mode
+	RTC->ISR |= (1U << 7);
+
+	//Poll INITF bit of in the RTC_ISR register for value 1
+	while(!(RTC->ISR & (1U << 6)));
+
+	//Program prescaler to generate a 1 Hz clock for the calendar counter
+    RTC->PRER = (127 << 16) | 255;
+
+	//Load the initial time and date values in the shadow registers (RTC_TR and RTC_DR)
+    INIT_DATE(date);
+    INIT_TIME(time);
+
 
 
 	//Configure the time format (12 or 24 hours) through the FMT bit in the RTC_CR
@@ -82,9 +139,6 @@ void Alarm_INIT(ALARM_TIME *time,ALARM_DATE *date){
 
 	//Set alarm
 	ALARM_DATE_AND_TIME(date,time);
-
-
-
 
 	//Enable ALARM Interrupt
 	RTC->CR |= (1U << 12);

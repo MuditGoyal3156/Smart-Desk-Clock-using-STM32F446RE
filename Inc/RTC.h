@@ -37,6 +37,7 @@ typedef struct
     uint8_t Seconds;
 }ALARM_TIME;
 void RTC_INIT(RTC_TIME *time,RTC_DATE *date);
+void RTC_UPDATE(RTC_TIME *time,RTC_DATE *date);
 void INIT_DATE(RTC_DATE *data);
 void INIT_TIME(RTC_TIME *data);
 void GET_TIME(RTC_TIME *data);
