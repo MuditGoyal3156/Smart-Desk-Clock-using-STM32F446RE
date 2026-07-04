@@ -17,23 +17,45 @@
 extern uint8_t FRAME_BUFFER[FB_SIZE];
 
 DHT_DATA sensor;
+ALARM_DATE Data;
+ALARM_TIME time;
+RTC_DATE Date;
+RTC_TIME Time;
+
+volatile uint8_t set_date=0;
+volatile uint8_t alarm_date = 1;
+volatile uint8_t alarm_hour = 0;
+volatile uint8_t alarm_minute = 0;
+volatile uint8_t time_select = 0;
+volatile uint8_t timer = 0;
+
+volatile uint8_t date = 1;
+volatile uint8_t month = 1;
+volatile uint8_t year = 0;
+volatile uint8_t hour = 0;
+volatile uint8_t minute = 0;
+
 
 char temp_str[32];
 char pressure_str[32];
-uint8_t count = 0;
-uint8_t sensor_select = 0;
-RTC_DATE Date;
-RTC_TIME Time;
-int32_t t_int = 0;
-int32_t t_dec = 0;
-uint32_t p_pa = 0;
-uint32_t p_int = 0;
-uint32_t p_dec = 0;
+volatile uint8_t count = 0;
+volatile uint8_t sensor_select = 0;
+
+
+volatile int32_t t_int = 0;
+volatile int32_t t_dec = 0;
+volatile uint32_t p_pa = 0;
+volatile uint32_t p_int = 0;
+volatile uint32_t p_dec = 0;
 
 
 volatile uint8_t contrast = 0;
 volatile uint8_t navigation = 0;
-volatile uint8_t old_navigation = 255;
+
+
+void BUZZ_INIT(void);
+void BUZZ_OFF(void);
+void BUZZ_ON(void);
 void SysTick_Callback(void);
 
 int main(void)
@@ -44,8 +66,16 @@ int main(void)
     SPI_DMA_INIT();
     Display_Init(0xFF);
 	I2C_INIT();
+	BUZZ_INIT();
 	I2C_INTERRUPT_EN();
-	RTC_INIT();
+	Date.Date = 1;
+	Date.Month = 1;
+	Date.Year = 00;
+
+	Time.Hours = 0;
+	Time.Minutes = 0;
+	Time.Seconds = 0;
+	RTC_INIT(&Time,&Date);
 	ADC_INIT();
 	one_sec_delay();
 	Interrupt_INIT();
@@ -70,32 +100,34 @@ int main(void)
 			switch(navigation)
 			{
 				case 0:
-			        if(count % 2 == 0)
-			        {
-			            if(sensor_select == 0)
-			            {
-			                DHT22_DATA(&sensor);
-			                GET_DATE(&Date);
-			                GET_TIME(&Time);
-			            }
-			            else
-			            {
-			                GET_TIME(&Time);
+					if(set_date == 0){
+						if(count % 2 == 0)
+						{
+							if(sensor_select == 0)
+							{
+								DHT22_DATA(&sensor);
+								GET_DATE(&Date);
+								GET_TIME(&Time);
+							}
+							else
+							{
+								GET_TIME(&Time);
 
-			                temp  = BMP280_ReadTemperature();
-			                press = BMP280_ReadPressure();
+								temp  = BMP280_ReadTemperature();
+								press = BMP280_ReadPressure();
 
-			                t_int = temp / 100;
-			                t_dec = temp % 100;
+								t_int = temp / 100;
+								t_dec = temp % 100;
 
-			                p_pa  = press / 256;
-			                p_int = p_pa / 100;
-			                p_dec = p_pa % 100;
+								p_pa  = press / 256;
+								p_int = p_pa / 100;
+								p_dec = p_pa % 100;
 
-			                sprintf(temp_str,"Temperature: %ld.%02ld C",t_int,t_dec);
-			                sprintf(pressure_str,"Pressure: %ld.%02ld hPa",p_int,p_dec);
-			            }
-			        }
+								sprintf(temp_str,"Temperature: %ld.%02ld C",t_int,t_dec);
+								sprintf(pressure_str,"Pressure: %ld.%02ld hPa",p_int,p_dec);
+							}
+						}
+					}
 				    char line1[24];
 				    char line2[24];
 				    char line3[24];
@@ -105,6 +137,7 @@ int main(void)
 				    sprintf(line2,"Time: %02d:%02d", Time.Hours, Time.Minutes);
 				    sprintf(line3,"Temp: %ld.%02ldC",t_int,t_dec);
 				    sprintf(line4,"Hum:  %d.%d %%", sensor.humidity/10,sensor.humidity%10);
+
 				    draw_text(48,0,8,"HOME");
 				    draw_text(0,16,8,line1);
 				    draw_text(0,28,8,line2);
@@ -113,13 +146,24 @@ int main(void)
 				    break;
 
 				case 1:
+				    char HOUR_DISPLAY[24];
+				    char MINUTE_DISPLAY[24];
 
-				   draw_text(44,0,8,"ALARM");
+				    sprintf(HOUR_DISPLAY,"Hour: %02d", alarm_hour);
+				    sprintf(MINUTE_DISPLAY,"Minute: %02d",alarm_minute);
+
+				    draw_text(44,0,8,"ALARM");
+				    draw_text(0,28,8,HOUR_DISPLAY);
+				    draw_text(0,40,8,MINUTE_DISPLAY);
+
 				   break;
 
 				case 2:
-				   draw_text(44,0,8,"TIMER");
+				    char TIMER[24];
 
+				    sprintf(TIMER,"%02d", timer);
+				   draw_text(44,0,8,"TIMER");
+				   draw_text(44,28,16,TIMER);
 				   break;
 			}
 			Display_Update();
@@ -142,6 +186,27 @@ int main(void)
 	        memset(FRAME_BUFFER, 0, FB_SIZE);
 		}
 	}
+}
+//PB6
+void BUZZ_INIT(void){
+	//Clock already enabled
+
+	//Set PB6 as output
+	GPIOB->MODER &= ~(3U << 12);
+	GPIOB->MODER |= (1U << 12);
+
+
+}
+
+void BUZZ_OFF(void){
+	//Write 0 to PB6
+	GPIOB->ODR &= ~(1U << 6);
+
+}
+void BUZZ_ON(void){
+	//Write 1 to PB6
+	GPIOB->ODR |= (1U << 6);
+
 }
 void SysTick_Callback(void)
 {
@@ -186,7 +251,7 @@ void I2C_ApplicationEventCallback(I2C_Handle_t *pI2CHandle,uint8_t AppEv)
 
 	}else if(AppEv == I2C_ERROR_AF)
 	{
-		printf("Ack failure\n");
+		printf("Ack failure\r\n");
 
 		I2C_CloseSendData(&I2C_Handle);
 
@@ -232,4 +297,141 @@ void EXTI0_IRQHandler(void){
         // Simple debounce delay
         for(int i = 0; i< 250000;i++); //debounce
     }
+}
+
+void RTC_Alarm_IRQHandler(void)
+{
+    if(RTC->ISR & (1U << 8))
+    {
+        RTC->ISR &= ~(1U << 8);
+
+        EXTI->PR = (1U << 17);
+
+        printf("ALARM SET\r\n");
+        BUZZ_ON();
+
+    }
+}
+
+void EXTI3_IRQHandler(void){
+
+    if (EXTI->PR & (1U << 3))
+    {
+        // Clear the pending bit
+        EXTI->PR |= (1U << 3);
+
+        BUZZ_OFF();
+
+       alarm_date = 0;
+       alarm_hour = 0;
+       alarm_minute = 0;
+       Data.Date = alarm_date;
+       time.Hours = alarm_hour;
+       time.Minutes = alarm_minute;
+       Alarm_INIT(&time, &Data);
+
+        // Simple debounce delay
+        for(int i = 0; i< 250000;i++); //debounce
+    }
+
+}
+void EXTI4_IRQHandler(void){
+
+    if (EXTI->PR & (1U << 4))
+    {
+        // Clear the pending bit
+        EXTI->PR |= (1U << 4);
+        if(navigation==0){
+        	time_select = (time_select + 1) % 5;
+        }else if(navigation==1){
+        	time_select = (time_select + 1) % 2;
+        }
+
+
+        // Simple debounce delay
+        for(int i = 0; i< 250000;i++); //debounce
+    }
+}
+void EXTI9_5_IRQHandler(void){
+
+    if (EXTI->PR & (1U << 5))
+    {
+        // Clear the pending bit
+        EXTI->PR |= (1U << 5);
+
+        if(navigation == 0){
+        	set_date = 1;
+        	switch(time_select){
+        	case 0:
+        		date++;
+        		if(date > 31)
+        			date = 1;
+        		break;
+        	case 1:
+        		month++;
+        		if(month >12)
+        			month = 1;
+        		break;
+        	case 2:
+        		year = (year +1)%100;
+        		break;
+        	case 3:
+        		hour = (hour + 1)%24;
+        		break;
+        	case 4:
+        		minute = (minute + 1)%60;
+        		break;
+        	}
+
+        	Date.Date = date;
+        	Date.Month = month;
+        	Date.Year = year;
+        	Time.Hours = hour;
+			Time.Minutes = minute;
+			Time.Seconds = 0;
+        }else if(navigation == 1){
+        	switch(time_select){
+        	case 0:
+        		alarm_hour = (alarm_hour + 1) % 24;
+        		break;
+        	case 1:
+        		alarm_minute = (alarm_minute + 1) % 60;
+        		break;
+        	}
+
+        	time.Hours = alarm_hour;
+			time.Minutes = alarm_minute;
+			time.Seconds = 5;
+        }else if(navigation == 2){
+        	timer = (timer+1)%61;
+        }
+
+
+        // Simple debounce delay
+        for(int i = 0; i< 250000;i++); //debounce
+    }
+
+}
+
+void EXTI15_10_IRQHandler(void){
+
+    if (EXTI->PR & (1U << 10))
+    {
+        // Clear the pending bit
+        EXTI->PR |= (1U << 10);
+        if(navigation == 0){
+        	RTC_INIT(&Time,&Date);
+        	set_date = 0;
+        	for(int i = 0; i< 20000;i++);
+
+        }else if(navigation == 1){
+        	Alarm_INIT(&time, &Data);
+        }else if(navigation == 2){
+
+        }
+
+        // Simple debounce delay
+        for(int i = 0; i< 250000;i++); //debounce
+    }
+
 }

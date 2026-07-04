@@ -6,7 +6,7 @@
  */
 #include "RTC.h"
 
-void RTC_INIT(void){
+void RTC_INIT(RTC_TIME *time,RTC_DATE *date){
 	//Enable PWR CLK(APB1)
 	RCC->APB1ENR |= (1U << 28);
 
@@ -46,11 +46,9 @@ void RTC_INIT(void){
     RTC->PRER = (127 << 16) | 255;
 
 	//Load the initial time and date values in the shadow registers (RTC_TR and RTC_DR)
-    // INITS flag: 0 = not initialized
-    if (!(RTC->ISR & (1U << 4))) {  // INITS flag: 0 = not initialized
-        INIT_DATE();
-        INIT_TIME();
-    }
+        INIT_DATE(date);
+        INIT_TIME(time);
+
 
 	//Configure the time format (12 or 24 hours) through the FMT bit in the RTC_CR
     RTC->CR &= ~(1U << 6);
@@ -61,21 +59,87 @@ void RTC_INIT(void){
 	//Enable Write Protection
 	RTC->WPR = 0XFF;
 }
+void Alarm_INIT(ALARM_TIME *time,ALARM_DATE *date){
+	//Remove Write protection
+	/*
+	 * IN RTC_WPR Register
+	 * Write 0xCA
+	 * Write 0x53
+	 * In order
+	 */
+	RTC->WPR = 0XCA;
+	RTC->WPR = 0X53;
 
-void INIT_DATE(void)
+	//Disable ALARM
+	RTC->CR &= ~(1U << 8);
+
+	//POLL for write flag
+	while(!(RTC->ISR & (1U << 0)));
+
+	//Clear pending alarm flag
+	RTC->ISR &= ~(1U << 8);
+	EXTI->PR = (1U << 17);
+
+	//Set alarm
+	ALARM_DATE_AND_TIME(date,time);
+
+
+
+
+	//Enable ALARM Interrupt
+	RTC->CR |= (1U << 12);
+
+	//Enable EXTI Line 17
+	EXTI->IMR  |= (1U << 17);
+
+	//Select rising edge trigger
+	EXTI->RTSR |= (1U << 17);
+
+	//Enable IRQ
+	NVIC_SetPriority(RTC_Alarm_IRQn, 0);
+	NVIC_EnableIRQ(RTC_Alarm_IRQn);
+
+	//Enable ALARM
+	RTC->CR |= (1U << 8);
+
+	//Enable Write Protection
+	RTC->WPR = 0xFF;
+}
+void ALARM_DATE_AND_TIME(ALARM_DATE *data,ALARM_TIME *time)
 {
-	uint8_t year = DecimaltoBCD(26);
-	uint8_t month = DecimaltoBCD(6);
-	uint8_t date = DecimaltoBCD(23);
+	uint8_t Hour = DecimaltoBCD(time->Hours);
+	uint8_t Minute = DecimaltoBCD(time->Minutes);
+	uint8_t Second = DecimaltoBCD(time->Seconds);
+
+	uint32_t register_value = (Hour << 16) | (Minute << 8) | (Second << 0);
+
+	// ALARM MASK CONFIGURATION
+	register_value |=  (1U << 31);  // SET MSK4: Ignore the Date field (Daily Alarm)
+	register_value &= ~(1U << 30);  // WDSEL: Date/WeekDay selection
+	register_value &= ~(1U << 23);  // CLEAR MSK3: Match Hour exactly
+	register_value &= ~(1U << 22);  // PM bit (Keep 0 for 24-hour format)
+	register_value &= ~(1U << 15);  // CLEAR MSK2: Match Minute exactly
+	register_value &= ~(1U << 7);   // CLEAR MSK1: Match Second exactly
+
+	RTC->ALRMAR = register_value;
+}
+
+
+
+void INIT_DATE(RTC_DATE *data)
+{
+	uint8_t year = DecimaltoBCD(data->Year);
+	uint8_t month = DecimaltoBCD(data->Month);
+	uint8_t date = DecimaltoBCD(data->Date);
 	uint8_t weekday = 2;
 	uint32_t register_value=(year << 16)|(weekday << 13)|(month << 8)|(date << 0);
 	RTC->DR = register_value;
 }
 
-void INIT_TIME(void)
+void INIT_TIME(RTC_TIME *data)
 {
-	uint8_t Hour = DecimaltoBCD(23);
-	uint8_t Minute = DecimaltoBCD(30);
+	uint8_t Hour = DecimaltoBCD(data->Hours);
+	uint8_t Minute = DecimaltoBCD(data->Minutes);
 	uint8_t Second = DecimaltoBCD(00);
 	//uint8_t PM = 0;//24Hour Format (bit 22)
 	uint32_t register_value = (Hour << 16)|(Minute << 8)|(Second << 0);
